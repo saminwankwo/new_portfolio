@@ -1,62 +1,94 @@
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import './globals.css';
+import Scanlines from './_components/Scanlines';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Canonical metadata for every route (Issue 14). Child pages override via the
-// `metadata` export, which composes with the `title.template` below.
 export const metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "Samuel Nwankwo · Portfolio",
-    template: "%s · Samuel Nwankwo",
+    default: 'Samuel Nwankwo ~ /home/samuel',
+    template: '%s · Samuel Nwankwo',
   },
   description:
-    "Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Developer.",
+    'Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Engineer building web apps, ad tracking, and developer platforms.',
   keywords: [
-    "Samuel Nwankwo",
-    "Full-Stack Developer",
-    "Backend Engineer",
-    "Node.js",
-    "PHP",
-    "Laravel",
-    "Portfolio",
+    'Samuel Nwankwo',
+    'Full-Stack Developer',
+    'Backend Engineer',
+    'Node.js',
+    'PHP',
+    'Laravel',
+    'Next.js',
+    'React',
+    'Ad Tracking',
+    'Lead Tracker',
+    'Portfolio',
+    'Terminal Portfolio',
+    'saminwankwo',
   ],
-  authors: [{ name: "Samuel Nwankwo" }],
-  creator: "Samuel Nwankwo",
+  authors: [{ name: 'Samuel Nwankwo', url: siteUrl }],
+  creator: 'Samuel Nwankwo',
+  publisher: 'Samuel Nwankwo',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    type: "website",
-    locale: "en_US",
-    siteName: "Samuel Nwankwo · Portfolio",
-    title: "Samuel Nwankwo · Portfolio",
+    type: 'website',
+    locale: 'en_US',
+    url: siteUrl,
+    siteName: 'Samuel Nwankwo · Portfolio',
+    title: 'Samuel Nwankwo ~ /home/samuel',
     description:
-      "Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Developer.",
+      'Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Engineer building web apps, ad tracking, and developer platforms.',
   },
   twitter: {
-    card: "summary",
-    title: "Samuel Nwankwo · Portfolio",
+    card: 'summary_large_image',
+    creator: '@saminwankwo',
+    title: 'Samuel Nwankwo ~ /home/samuel',
     description:
-      "Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Developer.",
+      'Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Engineer building web apps, ad tracking, and developer platforms.',
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  icons: {
+    icon: '/favicon.ico',
+  },
+};
+
+export const viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)',  color: '#0a0f0a' },
+    { media: '(prefers-color-scheme: light)', color: '#0a0f0a' },
+  ],
+  colorScheme: 'dark',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html
+      lang="en"
+      data-theme="green"
+      className="font-terminal"
+      suppressHydrationWarning
+    >
+      <body className="antialiased">
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        <main id="main-content">{children}</main>
+        <Scanlines />
+        <main id="main-content" className="terminal-screen">
+          {children}
+        </main>
       </body>
     </html>
   );

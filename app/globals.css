@@ -2,62 +2,367 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /*
-   * Single dark theme for every route (the terminal-first design implies dark).
-   * Previously Home was dark while Projects/Experience/Contact were light.
-   */
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --accent: #86efac;
-  --muted: #9ca3af;
-  color-scheme: dark;
-}
-
-html,
-body {
-  min-height: 100%;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
-
-/* WCAG skip-to-content link: off-screen until focused (Issue 20) */
-.skip-link {
-  position: fixed;
-  top: -100px;
-  left: 1rem;
-  z-index: 100;
-  padding: 0.75rem 1rem;
-  background: var(--accent);
-  color: #052e16;
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 14px;
-  border-radius: 0 0 4px 4px;
-  transition: top 0.2s ease;
-}
-
-.skip-link:focus {
-  top: 0;
-}
-
-/* Visible focus ring for keyboard users (Issue 20) */
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Respect reduced-motion preferences (Issue 21) */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+@layer base {
+  :root,
+  html[data-theme='green'] {
+    --terminal-bg:         #0a0f0a;
+    --terminal-fg:         #86efac;
+    --terminal-fg-dim:     #4ade80;
+    --terminal-accent:     #22c55e;
+    --terminal-error:      #f87171;
+    --terminal-warning:    #fbbf24;
+    --terminal-path:       #67e8f9;
+    --terminal-border:     rgba(134, 239, 172, 0.18);
+    --terminal-selection:  rgba(34, 197, 94, 0.35);
   }
+
+  html[data-theme='amber'] {
+    --terminal-bg:         #120d05;
+    --terminal-fg:         #fcd34d;
+    --terminal-fg-dim:     #f59e0b;
+    --terminal-accent:     #f59e0b;
+    --terminal-error:      #fb7185;
+    --terminal-warning:    #a3e635;
+    --terminal-path:       #fde68a;
+    --terminal-border:     rgba(252, 211, 77, 0.18);
+    --terminal-selection:  rgba(245, 158, 11, 0.35);
+  }
+
+  html[data-theme='retro-amber'] {
+    --terminal-bg:         #1a0e02;
+    --terminal-fg:         #ffb000;
+    --terminal-fg-dim:     #b45309;
+    --terminal-accent:     #ea580c;
+    --terminal-error:      #ef4444;
+    --terminal-warning:    #fde047;
+    --terminal-path:       #fbbf24;
+    --terminal-border:     rgba(255, 176, 0, 0.22);
+    --terminal-selection:  rgba(255, 176, 0, 0.30);
+  }
+
+  html[data-theme='blue'] {
+    --terminal-bg:         #060914;
+    --terminal-fg:         #93c5fd;
+    --terminal-fg-dim:     #3b82f6;
+    --terminal-accent:     #60a5fa;
+    --terminal-error:      #f472b6;
+    --terminal-warning:    #fde047;
+    --terminal-path:       #67e8f9;
+    --terminal-border:     rgba(147, 197, 253, 0.18);
+    --terminal-selection:  rgba(96, 165, 250, 0.35);
+  }
+
+  html[data-theme='synthwave'] {
+    --terminal-bg:         #130924;
+    --terminal-fg:         #f0abfc;
+    --terminal-fg-dim:     #c084fc;
+    --terminal-accent:     #22d3ee;
+    --terminal-error:      #fb7185;
+    --terminal-warning:    #fde047;
+    --terminal-path:       #67e8f9;
+    --terminal-border:     rgba(240, 171, 252, 0.18);
+    --terminal-selection:  rgba(192, 132, 252, 0.35);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    padding: 0;
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: var(--terminal-bg);
+    color: var(--terminal-fg);
+    font-family: theme('fontFamily.terminal');
+    font-size: 15.5px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (min-width: 1024px) {
+    html, body { font-size: 16.5px; }
+  }
+
+  ::selection {
+    background: var(--terminal-selection);
+    color: var(--terminal-fg);
+  }
+
+  /* Always show focus ring on keyboard focus */
+  :focus-visible {
+    outline: 2px solid var(--terminal-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  :focus {
+    outline: none;
+  }
+
+  a {
+    color: var(--terminal-path);
+    text-decoration: underline;
+    text-decoration-color: rgba(103, 232, 249, 0.35);
+    text-underline-offset: 2px;
+  }
+  a:hover {
+    text-decoration-color: var(--terminal-path);
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+    .scanlines-overlay,
+    .animate-scanline,
+    .animate-blink {
+      display: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+@layer components {
+  .terminal-screen {
+    @apply min-h-[100dvh] w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10;
+    background-color: var(--terminal-bg);
+  }
+
+  .terminal-prompt {
+    color: var(--terminal-accent);
+    font-weight: 600;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  .terminal-path {
+    color: var(--terminal-path);
+    font-weight: 500;
+  }
+
+  .terminal-line {
+    width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .terminal-line--input {
+    color: var(--terminal-fg);
+  }
+
+  .terminal-line--output {
+    color: var(--terminal-fg-dim);
+  }
+
+  .terminal-line--error {
+    color: var(--terminal-error);
+  }
+
+  .terminal-line--warning {
+    color: var(--terminal-warning);
+  }
+
+  .terminal-line--banner {
+    color: var(--terminal-fg);
+    font-weight: 500;
+  }
+
+  .terminal-ascii {
+    color: var(--terminal-fg);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: 0.01em;
+  }
+
+  .terminal-ascii small {
+    font-size: 0.7em;
+    color: var(--terminal-fg-dim);
+    font-weight: 500;
+  }
+
+  .terminal-frame {
+    border: 1px solid var(--terminal-border);
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .terminal-frame__titlebar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--terminal-border);
+    font-size: 0.8rem;
+    color: var(--terminal-fg-dim);
+    user-select: none;
+  }
+
+  .terminal-frame__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    display: inline-block;
+  }
+
+  .terminal-frame__dot--close   { background-color: #ff5f56; }
+  .terminal-frame__dot--min     { background-color: #ffbd2e; }
+  .terminal-frame__dot--max     { background-color: #27c93f; }
+
+  .terminal-frame__body {
+    padding: 1rem;
+  }
+
+  /* Input row styling */
+  .terminal-input-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.25rem 0.5rem;
+  }
+  .terminal-input-row:focus-within {
+    background: linear-gradient(
+      90deg,
+      rgba(34, 197, 94, 0.06),
+      transparent
+    );
+    border-radius: 4px;
+    margin: 0 -0.25rem;
+    padding: 0 0.25rem;
+  }
+
+  .terminal-input {
+    flex: 1 1 12rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--terminal-fg);
+    caret-color: var(--terminal-accent);
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    padding: 0;
+    min-width: 0;
+  }
+  .terminal-input::placeholder {
+    color: var(--terminal-fg-dim);
+    opacity: 0.5;
+  }
+
+  /* Skip link */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--terminal-accent);
+    color: var(--terminal-bg);
+    padding: 0.5rem 1rem;
+    font-weight: 700;
+    z-index: 100;
+  }
+  .skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    outline: 2px solid var(--terminal-bg);
+    outline-offset: 2px;
+  }
+
+  .scanlines-overlay {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02) 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: overlay;
+  }
+
+  .scanlines-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 55%,
+      rgba(0, 0, 0, 0.55) 100%
+    );
+  }
+
+  /* Form fields */
+  .term-form__label {
+    color: var(--terminal-fg-dim);
+    font-size: 0.9em;
+  }
+  .term-form__field {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--terminal-border);
+    color: var(--terminal-fg);
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: inherit;
+    border-radius: 4px;
+  }
+  .term-form__field:focus-visible {
+    outline: none;
+    border-color: var(--terminal-accent);
+    box-shadow: 0 0 0 2px var(--terminal-selection);
+  }
+  .term-form__field::placeholder {
+    color: var(--terminal-fg-dim);
+    opacity: 0.4;
+  }
+  .term-form__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1rem;
+    background: var(--terminal-accent);
+    color: var(--terminal-bg);
+    border: none;
+    border-radius: 4px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.15s ease;
+  }
+  .term-form__btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+  }
+  .term-form__btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .term-form__btn--ghost {
+    background: transparent;
+    color: var(--terminal-accent);
+    border: 1px solid var(--terminal-border);
+  }
+}
+
+@layer utilities {
+  .text-terminal-error   { color: var(--terminal-error); }
+  .text-terminal-warning { color: var(--terminal-warning); }
+  .text-terminal-path    { color: var(--terminal-path); }
+  .text-terminal-accent  { color: var(--terminal-accent); }
+  .bg-terminal-bg        { background-color: var(--terminal-bg); }
+  .border-terminal-border{ border-color: var(--terminal-border); }
 }
