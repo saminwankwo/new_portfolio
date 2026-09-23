@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { COMMANDS, COMMAND_NAMES } from '../_lib/commands.js';
+import { COMMANDS, COMMAND_NAMES, VALID_THEMES } from '../_lib/commands.js';
 import {
   homePath, resolvePath, routeToDir, prettyPath,
   isDir, listDir as fsListDir,
@@ -31,7 +31,7 @@ const BOOT_HISTORY = [
   {
     id: 'boot-1',
     type: 'banner',
-    content: 'snsh 1.0 — connected to samuel@portfolio (NwankwoOS 1.0, Green Monochrome).',
+    content: 'snsh 1.0 — connected to samuel@portfolio (NwankwoOS 1.0, Carbon Dark).',
   },
   {
     id: 'boot-2',
@@ -52,7 +52,7 @@ const BOOT_HISTORY = [
  *   .terminal-scroll  → route content (server-rendered, SEO) + transcript
  *   .terminal-input-row → pinned prompt + stdin, always visible
  */
-export default function TerminalShell({ children, initialCwd, initialTheme = 'green' }) {
+export default function TerminalShell({ children, initialCwd, initialTheme = 'dark' }) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -110,7 +110,12 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
     // Restore persisted session (theme, cwd, input history, transcript).
     try {
       const t = localStorage.getItem(`${STORAGE_KEY}:theme`);
-      if (t) { setThemeState(t); document.documentElement.setAttribute('data-theme', t); }
+      // Ignore anything that isn't a known theme (stale/typo'd values would
+      // leave the palette falling back to `:root` while state says otherwise).
+      if (t && VALID_THEMES.includes(t)) {
+        setThemeState(t);
+        document.documentElement.setAttribute('data-theme', t);
+      }
       const c = localStorage.getItem(`${STORAGE_KEY}:cwd`);
       if (c) setCwd(c);
       const ih = JSON.parse(localStorage.getItem(`${STORAGE_KEY}:inputs`) || '[]');

@@ -66,8 +66,8 @@ export const metadata = {
 
 export const viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: dark)',  color: '#0a0f0a' },
-    { media: '(prefers-color-scheme: light)', color: '#0a0f0a' },
+    { media: '(prefers-color-scheme: dark)',  color: '#0d1117' },
+    { media: '(prefers-color-scheme: light)', color: '#0d1117' },
   ],
   colorScheme: 'dark',
   width: 'device-width',
@@ -87,7 +87,7 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      data-theme="green"
+      data-theme="dark"
       className="font-terminal"
       suppressHydrationWarning
     >

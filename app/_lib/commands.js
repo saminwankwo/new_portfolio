@@ -5,7 +5,7 @@ import {
 import PROFILE from './data/profile.js';
 import PROJECTS from './data/projects.js';
 
-const VALID_THEMES = ['green', 'amber', 'retro-amber', 'blue', 'synthwave'];
+const VALID_THEMES = ['dark', 'green', 'amber', 'retro-amber', 'blue', 'synthwave'];
 
 /** URL routes that are *not* directories in the virtual FS. */
 const ROUTE_PATHS = new Set(['/', '/projects', '/experience', '/contact', '/resume']);
@@ -366,7 +366,7 @@ export const COMMANDS = {
         `Terminal   : SN-Term v1 (tab-complete, history, reduced-motion aware)`,
         `CPU        : Full-Stack Engineer × 24 (${PROFILE.location.country} based)`,
         `Memory     : ∞ ideas  /  1 MacBook Pro`,
-        `Projects   : ${PROJECTS.length} shipped + active`,
+        `Projects   : ${PROJECTS.length} shipped + featured`,
         `Availability: ${PROFILE.availability}`,
       ];
       const out = zipTwoColumns(ASCII_SN_LOGO.split('\n'), lines);
@@ -400,9 +400,9 @@ export const COMMANDS = {
 /* -------------------------------- helpers ------------------------------- */
 
 function currentThemeName() {
-  if (typeof document === 'undefined') return 'green';
+  if (typeof document === 'undefined') return 'dark';
   const t = document.documentElement.getAttribute('data-theme');
-  return VALID_THEMES.includes(t) ? t : 'green';
+  return VALID_THEMES.includes(t) ? t : 'dark';
 }
 
 function browserOpen(ctx, url) {

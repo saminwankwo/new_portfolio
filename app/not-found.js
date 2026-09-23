@@ -18,7 +18,7 @@ export default function NotFound() {
     '',
     'Did you mean:',
     '  cd ~              back to the home directory',
-    '  cd projects       6 shipped + active projects',
+    '  cd projects       32 shipped + featured projects',
     '  cd experience     roles, timeline, education',
     '  cat contact.txt   email / socials / calendar link',
     '  open resume.pdf   download the résumé',

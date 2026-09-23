@@ -6,7 +6,7 @@ import { readFile } from '../_lib/fileSystem.js';
 export const metadata = {
   title: '~/projects',
   description:
-    'Selected projects by Samuel Nwankwo — developer tooling, prediction APIs, multi-tenant SaaS, ad-tracking infrastructure and desktop POS.',
+    '32 selected projects by Samuel Nwankwo — auth SDKs, multi-tenant SaaS, e-commerce APIs, ML and serverless, healthcare, ERP and CI/CD infrastructure.',
 };
 
 const PERMS = '-rw-r--r--';
@@ -27,10 +27,12 @@ function humanSize(value) {
 function projectRow(project) {
   const href = project.link || project.github;
   const size = humanSize(JSON.stringify(project).length);
-  const name = (
+  const name = href ? (
     <a href={href} target="_blank" rel="noopener noreferrer">
       {project.name}
     </a>
+  ) : (
+    <span>{project.name}</span>
   );
   return (
     <span key={project.id}>

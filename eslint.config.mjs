@@ -9,6 +9,11 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-const eslintConfig = [...compat.extends("next/core-web-vitals")];
+const eslintConfig = [
+  // Generated build output (and vendored deps) must never be linted:
+  // `eslint .` would otherwise pick up minified React runtime chunks.
+  { ignores: ['.next/**', 'node_modules/**', 'out/**', 'build/**'] },
+  ...compat.extends("next/core-web-vitals"),
+];
 
 export default eslintConfig;

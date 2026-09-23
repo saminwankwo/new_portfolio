@@ -5,7 +5,7 @@ import { readFile } from '../_lib/fileSystem.js';
 export const metadata = {
   title: '~/experience',
   description:
-    'Work experience, roles and education of Samuel Nwankwo — Full-Stack Engineer (SN TECH, freelance, fintech contract).',
+    'Work experience, roles and education of Samuel Nwankwo — backend engineer (Phunplan, Sweeftly, Olotu Square, Webxiel, iGiet, Credib, Emblic).',
 };
 
 // Single source of truth: the same content `cat experience/index.md` prints
@@ -23,7 +23,7 @@ export default function Experience() {
       />
 
       <p className="terminal-line terminal-line--warning">
-        {'→ '}try <code className="text-terminal-accent">cat experience/sn-tech.md</code> in the
+        {'→ '}try <code className="text-terminal-accent">cat experience/phunplan.md</code> in the
         prompt for a single role, or{' '}
         <a href="/samuel-nwankwo-resume.pdf" download>
           curl /resume.pdf

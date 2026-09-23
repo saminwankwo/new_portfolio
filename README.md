@@ -1,8 +1,8 @@
 # snsh — terminal portfolio
 
 The interactive terminal portfolio of **Samuel Nwankwo** (`saminwankwo`) — every
-route is a "screen" inside one persistent shell: same monospace green-on-black
-theme, same prompt, keyboard-first navigation.
+route is a "screen" inside one persistent shell: dark neutral palette by default,
+same prompt, keyboard-first navigation.
 
 ```bash
 npm install
@@ -30,7 +30,7 @@ Requires Node >= 20 (see `.nvmrc`).
 | `app/_components/TerminalBlock.jsx` | Server-rendered "screenshot" block used by route pages (crawlable HTML) |
 | `app/_lib/commands.js` | The command registry (`COMMANDS`) — 13 commands |
 | `app/_lib/fileSystem.js` | Virtual FS tree powering `ls` / `cd` / `cat` / `open` |
-| `app/_lib/data/` | Single source of truth: projects, experience, profile, skills |
+| `app/_lib/data/` | Single source of truth: projects, experience, profile, skills (projects/experience ported from `saminwankwo.github.io`) |
 | `app/api/contact/route.js` | Server-side proxy for the contact form (keeps Formspree secret) |
 
 Route bodies are **server components** rendered as terminal blocks, so search
@@ -46,8 +46,8 @@ neofetch   pwd   echo   curl   clear   history   theme <name>
 
 Keyboard: `↑`/`↓` history · `Tab` autocomplete · `Ctrl+L` clear · `Ctrl+C` cancel.
 
-Themes: `theme green | amber | retro-amber | blue | synthwave` (persisted in
-`localStorage`).
+Themes: `theme dark | green | amber | retro-amber | blue | synthwave` (persisted
+in `localStorage`; `dark` is the default).
 
 ## Configuration
 

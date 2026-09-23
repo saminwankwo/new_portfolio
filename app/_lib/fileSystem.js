@@ -30,7 +30,7 @@ const ABOUT_MD = joinLines([
   ``,
   `Useful next steps:`,
   `  • cat skills.md         — grouped skills`,
-  `  • ls projects           — shipped + active work`,
+  `  • ls projects           — shipped + featured work`,
   `  • cat experience/index.md — career timeline`,
   `  • open contact          — reach out`,
   `  • open resume.pdf       — download resume`,
