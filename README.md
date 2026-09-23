@@ -51,7 +51,8 @@ in `localStorage`; `dark` is the default).
 
 ## Configuration
 
-Copy `.env.example` to `.env.local`:
+Copy `.env.example` to `.env.local` (a working `.env.local` already exists locally
+with the production URL `https://terminal.saminwankwo.dev` + Formspree endpoint):
 
 - `NEXT_PUBLIC_SITE_URL` — canonical URL (SEO, sitemap, OG)
 - `FORMSPREE_ENDPOINT` — contact form relay (server-side only). Until it is

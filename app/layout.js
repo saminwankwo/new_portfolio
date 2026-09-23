@@ -41,6 +41,9 @@ export const metadata = {
     title: 'Samuel Nwankwo ~ /home/samuel',
     description:
       'Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Engineer building web apps, ad tracking, and developer platforms.',
+    images: [
+      { url: '/og-image.png', width: 1200, height: 630, alt: 'Samuel Nwankwo — interactive terminal portfolio' },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
@@ -48,6 +51,7 @@ export const metadata = {
     title: 'Samuel Nwankwo ~ /home/samuel',
     description:
       'Interactive terminal-style portfolio of Samuel Nwankwo — Full-Stack Engineer building web apps, ad tracking, and developer platforms.',
+    images: ['/og-image.png'],
   },
   robots: {
     index: true,
@@ -60,7 +64,11 @@ export const metadata = {
     },
   },
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '48x48', type: 'image/x-icon' },
+    ],
+    apple: '/apple-touch-icon.png',
   },
 };
 
