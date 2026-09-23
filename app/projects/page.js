@@ -1,90 +1,74 @@
-import Link from 'next/link';
+import TerminalBlock from '../_components/TerminalBlock';
+import PROJECTS from '../_lib/data/projects.js';
+import { readFile } from '../_lib/fileSystem.js';
 
 // Static metadata replaces the deprecated `next/head` (Issues 5 + 14 + 26).
 export const metadata = {
-  title: 'Projects',
+  title: '~/projects',
   description:
-    'Selected projects by Samuel Nwankwo — developer tooling, prediction APIs, multi-tenant SaaS and e-commerce backends.',
+    'Selected projects by Samuel Nwankwo — developer tooling, prediction APIs, multi-tenant SaaS, ad-tracking infrastructure and desktop POS.',
 };
 
-const projects = [
-  {
-    title: "DevXP.dev",
-    description: "A platform to help developers practice skills like test-driven development, code reviews, and mastering Git workflows.",
-    techStack: ["Node.js", "Express", "MongoDB", "AWS"],
-  },
-  {
-    title: "Sports Prediction API",
-    description: "An API-driven sports prediction model that integrates a pre-trained machine learning model for real-time forecasts.",
-    techStack: ["Node.js", "Express", "MongoDB", "AWS"],
-  },
-  {
-    title: "Multitenancy in Laravel",
-    description: "A multi-tenant SaaS system managing separate databases per tenant to optimize resource usage.",
-    techStack: ["PHP", "Laravel", "MySQL"],
-  },
-  {
-    title: "Project Atlas",
-    description: "A scalable microservices-based analytics platform aggregating data from various APIs for real-time insights.",
-    techStack: ["Node.js", "Express", "MongoDB", "AWS"],
-  },
-  {
-    title: "E-Commerce API",
-    description: "A robust RESTful API for an e-commerce platform featuring secure payment integrations and efficient inventory management.",
-    techStack: ["PHP", "Laravel", "MySQL"],
-  },
-  {
-    title: "Interactive Developer Portfolio",
-    description: "A dynamic web application showcasing personal projects with real-time updates from GitHub.",
-    techStack: ["React", "Node.js", "AWS"],
-    // Only verified, live destinations are linked — the previous
-    // `https://example.com/*` placeholders all pointed at a parked domain (Issue 2).
-    link: "https://github.com/saminwankwo/saminwankwo.github.io",
-    linkLabel: "View on GitHub",
-  },
-];
+const PERMS = '-rw-r--r--';
+const MTIME = 'Sep 22 10:00';
+
+function humanSize(value) {
+  const units = ['B', 'K', 'M', 'G'];
+  let i = 0;
+  let n = Number(value) || 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${Math.round(n * 10) / 10}${units[i]}`;
+}
+
+/** One `ls -la` row per project; the name links to the real destination. */
+function projectRow(project) {
+  const href = project.link || project.github;
+  const size = humanSize(JSON.stringify(project).length);
+  const name = (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {project.name}
+    </a>
+  );
+  return (
+    <span key={project.id}>
+      {`${PERMS}  ${'samuel'.padEnd(6)}  ${'staff'.padEnd(5)}  ${size.padStart(6)}  ${MTIME}  `}
+      {name}
+      {`  — ${project.description}  [${project.status}]`}
+    </span>
+  );
+}
+
+// Pre-expanded example so the page shows a full project card without JS.
+const sample = readFile('/home/samuel/projects/devxp.md');
+const sampleLines = sample.ok && sample.kind === 'text' ? sample.content.split('\n') : [];
 
 export default function Projects() {
+  const lines = [
+    `total ${PROJECTS.length}`,
+    ...PROJECTS.map(projectRow),
+    '',
+    `${PROJECTS.length} entries · run \`cat projects/<slug>.md\` for details, \`open projects/<slug>\` to launch it.`,
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-950 p-8">
-      <h1 className="mb-8 text-4xl font-bold text-center">Projects</h1>
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-        {projects.map((project) => (
-          <article
-            key={project.title}
-            className="p-6 border border-gray-800 rounded-lg bg-gray-900 shadow-md"
-          >
-            <h2 className="mb-2 text-2xl font-semibold">{project.title}</h2>
-            <p className="mb-4">{project.description}</p>
-            <p className="mb-4 text-sm text-gray-400">
-              Tech Stack: {project.techStack.join(', ')}
-            </p>
-            {project.link ? (
-              <a
-                href={project.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-green-400 hover:underline"
-              >
-                {project.linkLabel} ↗
-              </a>
-            ) : (
-              <Link href="/contact" className="text-green-400 hover:underline">
-                Ask me about this project →
-              </Link>
-            )}
-          </article>
-        ))}
-      </div>
-      <p className="mt-10 text-center">
-        <a
-          href="https://github.com/saminwankwo?tab=repositories"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-green-400 hover:underline"
-        >
-          More projects on GitHub ↗
-        </a>
+    <div className="flex flex-col gap-4">
+      <TerminalBlock lines={lines} titleBar="samuel@portfolio:~$ ls -la /home/samuel/projects" />
+
+      <TerminalBlock
+        lines={sampleLines}
+        titleBar="samuel@portfolio:~$ cat projects/devxp.md"
+        variant="banner"
+      />
+
+      <p className="terminal-line terminal-line--warning">
+        {'→ '}
+        <a href="https://github.com/saminwankwo?tab=repositories" target="_blank" rel="noopener noreferrer">
+          more repos on GitHub
+        </a>{' '}
+        · <a href="https://github.com/saminwankwo/saminwankwo.github.io" target="_blank" rel="noopener noreferrer">source of this site</a>
       </p>
     </div>
   );

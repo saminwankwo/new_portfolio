@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# snsh — terminal portfolio
 
-## Getting Started
-
-First, run the development server:
+The interactive terminal portfolio of **Samuel Nwankwo** (`saminwankwo`) — every
+route is a "screen" inside one persistent shell: same monospace green-on-black
+theme, same prompt, keyboard-first navigation.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm run build   # production build
+npm run start   # serve the production build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Requires Node >= 20 (see `.nvmrc`).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Next.js 15** (App Router, Turbopack) + **React 19**
+- **Tailwind CSS 3.4** with a CSS-variable terminal palette (`app/globals.css`)
+- **Zero runtime dependencies** beyond those — no UI kit, no state library
 
-## Learn More
+## How it fits together
 
-To learn more about Next.js, take a look at the following resources:
+| File | Role |
+|---|---|
+| `app/layout.js` | Mounts the persistent `TerminalShell` (layouts survive navigation → history/cwd/theme persist) + site metadata |
+| `app/template.js` | Thin structural wrapper around each route body |
+| `app/_components/TerminalShell.jsx` | Interactive shell: scrollback, pinned prompt, history, Tab-completion, autoscroll |
+| `app/_components/TerminalBlock.jsx` | Server-rendered "screenshot" block used by route pages (crawlable HTML) |
+| `app/_lib/commands.js` | The command registry (`COMMANDS`) — 13 commands |
+| `app/_lib/fileSystem.js` | Virtual FS tree powering `ls` / `cd` / `cat` / `open` |
+| `app/_lib/data/` | Single source of truth: projects, experience, profile, skills |
+| `app/api/contact/route.js` | Server-side proxy for the contact form (keeps Formspree secret) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Route bodies are **server components** rendered as terminal blocks, so search
+engines and link previews see real text without executing JS. The scrollback
+history is extra UX sugar layered on top.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Commands
 
-## Deploy on Vercel
+```
+help   ls [-la]   cd <path>   cat <file>   open <path|url>   whoami
+neofetch   pwd   echo   curl   clear   history   theme <name>
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Keyboard: `↑`/`↓` history · `Tab` autocomplete · `Ctrl+L` clear · `Ctrl+C` cancel.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Themes: `theme green | amber | retro-amber | blue | synthwave` (persisted in
+`localStorage`).
+
+## Configuration
+
+Copy `.env.example` to `.env.local`:
+
+- `NEXT_PUBLIC_SITE_URL` — canonical URL (SEO, sitemap, OG)
+- `FORMSPREE_ENDPOINT` — contact form relay (server-side only). Until it is
+  set, `/api/contact` answers `503` with a friendly "email me directly".
+- `NEXT_PUBLIC_CONTACT_EMAIL` / phone / social URLs
+
+## Resume PDF
+
+Drop your PDF at `public/samuel-nwankwo-resume.pdf`. If it is missing, the
+`/resume` route renders a graceful placeholder instead of a broken iframe.
+
+## Deploy
+
+Any Node 20+ host (Vercel, Railway, Render…): `npm run build && npm start`.

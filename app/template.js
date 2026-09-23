@@ -1,21 +1,13 @@
-import TerminalShell from './_components/TerminalShell';
-import { routeToDir } from './_lib/fileSystem';
-
 /**
- * Next.js App Router `template.js` wraps each route's page on navigation,
- * unlike `layout.js` which persists across navigations.
+ * App Router `template.js` remounts on every navigation, while `layout.js`
+ * persists. The interactive `TerminalShell` is therefore mounted in
+ * `layout.js` so its scrollback history / cwd / theme survive navigation.
  *
- * We still mount TerminalShell here so that (a) its internal state survives
- * inside a layout-like structure and (b) every route gets the shell wrapper
- * that contains route content inside the scrollback. The shell itself
- * listens to pathname changes for syncing cwd ↔ URL state.
+ * This template only provides the structural wrapper around the route body
+ * and injects the route content into the shell's scroll area. The shell
+ * itself listens to `usePathname()` and appends a synthetic `$ cd <path>`
+ * line when the URL changes (deep-link, browser back/forward, link click).
  */
 export default function Template({ children }) {
-  return (
-    <div className="flex min-h-[100dvh] w-full flex-col items-stretch justify-start">
-      <TerminalShell initialCwd={routeToDir('/')} initialTheme="green">
-        {children}
-      </TerminalShell>
-    </div>
-  );
+  return <div className="route-content">{children}</div>;
 }

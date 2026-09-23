@@ -1,29 +1,41 @@
 import Link from 'next/link';
+import TerminalBlock from './_components/TerminalBlock';
 
 export const metadata = {
-  title: 'Page not found',
-  description: 'The page you are looking for does not exist.',
+  title: '404 — no such file or directory',
+  description: 'The page you are looking for does not exist in this shell.',
 };
 
-// Branded 404 in the terminal's visual language (Issue 6).
+// Branded 404 in the terminal's visual language (Issue 6). The persistent
+// prompt from layout.js sits below it, so you can recover by typing a command.
 export default function NotFound() {
+  const lines = [
+    <span key="err" className="text-terminal-error">
+      bash: cd: no such file or directory
+    </span>,
+    '',
+    'exit status 1 — that path does not exist in this shell.',
+    '',
+    'Did you mean:',
+    '  cd ~              back to the home directory',
+    '  cd projects       6 shipped + active projects',
+    '  cd experience     roles, timeline, education',
+    '  cat contact.txt   email / socials / calendar link',
+    '  open resume.pdf   download the résumé',
+  ];
+
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-gray-950 p-8 font-mono text-green-300">
-      <p className="text-sm text-gray-400">404</p>
-      <h1 className="mt-2 text-2xl font-bold">bash: cd: no such file or directory</h1>
-      <p className="mt-4 text-center text-gray-400">
-        The page you are looking for does not exist or has been moved.
-      </p>
-      <pre className="mt-6 text-sm text-green-400">
-{`$ ls
-projects/  experience/  resume/  contact/`}
-      </pre>
-      <Link
-        href="/"
-        className="px-4 py-2 mt-6 text-gray-900 bg-green-400 rounded hover:bg-green-300"
-      >
-        cd ~ (back home)
-      </Link>
+    <div className="flex flex-col gap-4">
+      <TerminalBlock lines={lines} titleBar="samuel@portfolio: ~$ cd /nope" />
+
+      <div className="flex flex-wrap gap-3">
+        <Link className="term-form__btn" href="/">
+          cd ~ (back home)
+        </Link>
+        <Link className="term-form__btn term-form__btn--ghost" href="/projects">
+          cd projects
+        </Link>
+      </div>
     </div>
   );
 }

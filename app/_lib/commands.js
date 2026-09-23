@@ -1,11 +1,31 @@
 import {
-  listDir, readFile, resolvePath, homePath, normalizeSlashes,
-  isDir, isFile, dirToRoute, routeToDir, basename,
+  listDir, readFile, resolvePath, homePath, prettyPath,
+  isDir, dirToRoute, routeToDir,
 } from './fileSystem.js';
 import PROFILE from './data/profile.js';
 import PROJECTS from './data/projects.js';
 
 const VALID_THEMES = ['green', 'amber', 'retro-amber', 'blue', 'synthwave'];
+
+/** URL routes that are *not* directories in the virtual FS. */
+const ROUTE_PATHS = new Set(['/', '/projects', '/experience', '/contact', '/resume']);
+/** Route path → the FS directory `cd` should land in. (`/` is excluded: it
+ *  really exists as the FS root, so plain path resolution handles it.) */
+const ROUTE_ALIASES = {
+  '/projects':   '/home/samuel/projects',
+  '/experience': '/home/samuel/experience',
+  '/contact':    '/home/samuel',
+  '/resume':     '/home/samuel',
+};
+
+function navigate(route) {
+  return {
+    effects: async ({ router }) => {
+      try { router.push(route); } catch (_) {}
+    },
+  };
+}
+
 const ASCII_SN_LOGO = [
   '  SSSSS  N   N ',
   ' S    S  NN  N ',
@@ -75,7 +95,7 @@ export const COMMANDS = {
   pwd: {
     help: 'Print the current working directory',
     run(ctx) {
-      ctx.out(ctx.cwd === homePath() ? '~' : ctx.cwd);
+      ctx.out(prettyPath(ctx.cwd));
     },
   },
 
@@ -155,9 +175,20 @@ export const COMMANDS = {
   },
 
   cd: {
-    help: 'Change directory. Usage: cd ~ · cd projects · cd .. · cd /',
+    help: 'Change directory. Usage: cd ~ · cd projects · cd .. · cd /experience',
     run(ctx, argv) {
       const [target = '~'] = argv;
+
+      // Absolute route paths (`cd /experience`, `cd /contact`) resolve against
+      // the URL table, not just the virtual FS — and they update the browser
+      // URL so the page stays shareable.
+      if (Object.hasOwn(ROUTE_ALIASES, target)) {
+        const abs = ROUTE_ALIASES[target];
+        ctx.setCwd(abs);
+        if (target !== ctx.pathname) return navigate(target);
+        return;
+      }
+
       const abs = resolvePath(ctx.cwd, target);
       if (!isDir(abs)) {
         ctx.error(`cd: no such file or directory: ${target}`);
@@ -165,13 +196,7 @@ export const COMMANDS = {
       }
       ctx.setCwd(abs);
       const route = dirToRoute(abs);
-      if (route && typeof window !== 'undefined') {
-        return {
-          effects: async ({ router }) => {
-            try { router.push(route); } catch (_) {}
-          },
-        };
-      }
+      if (route && route !== ctx.pathname) return navigate(route);
     },
   },
 
@@ -221,16 +246,19 @@ export const COMMANDS = {
         return browserOpen(ctx, target);
       }
 
-      // Known route?
-      const known = new Set(['/', '/projects', '/experience', '/contact', '/resume', 'contact', 'projects', 'experience', 'resume']);
-      const normalized = target.startsWith('/') ? target : `/${target}`;
-      if (known.has(target) || known.has(normalized)) {
-        const route = target.startsWith('/') ? target : normalized;
-        const abs = routeToDir(route);
-        ctx.setCwd(abs);
-        return {
-          effects: async ({ router }) => { try { router.push(route); } catch (_) {} },
-        };
+      // Known route? (`open contact`, `open /resume`, `open /projects`)
+      const bare = target.replace(/^\//, '');
+      const route = ROUTE_PATHS.has(target)
+        ? target
+        : ROUTE_PATHS.has(`/${bare}`) ? `/${bare}` : null;
+      if (route) {
+        ctx.setCwd(routeToDir(route));
+        if (route !== ctx.pathname) {
+          ctx.out(`(opening ${route})`);
+          return navigate(route);
+        }
+        ctx.out(`(already at ${route})`);
+        return;
       }
 
       // Project file?
@@ -252,7 +280,7 @@ export const COMMANDS = {
         }
       }
 
-      if (leaf.kind === 'asset') return browserOpen(ctx, leaf.url);
+      if (leaf.kind === 'asset') return openAsset(ctx, leaf.url, target);
 
       if (leaf.ok && leaf.kind === 'text') {
         // "open" for a text file → equivalent to cat + prompt
@@ -265,7 +293,8 @@ export const COMMANDS = {
         const route = dirToRoute(abs);
         if (route) {
           ctx.setCwd(abs);
-          return { effects: async ({ router }) => { try { router.push(route); } catch (_) {} } };
+          if (route !== ctx.pathname) return navigate(route);
+          return;
         }
         ctx.out(`open: ${target} is a directory (use ls to list, cd to enter).`);
         return;
@@ -285,18 +314,23 @@ export const COMMANDS = {
       if (!target) { ctx.error('curl: missing URL'); return; }
 
       if (target === '/resume.pdf' || target.endsWith('resume.pdf')) {
+        const url = '/samuel-nwankwo-resume.pdf';
         return {
           effects: async () => {
             if (typeof window === 'undefined') return;
+            ctx.banner(`$ curl -sIL ${target}`);
+            if (!(await assetExists(url))) {
+              ctx.error('curl: (22) The requested URL returned error: 404 Not Found');
+              ctx.out('resume.pdf is not installed yet — email me for the latest copy.');
+              return;
+            }
             const a = document.createElement('a');
-            a.href = '/samuel-nwankwo-resume.pdf';
-            if (saveName) a.download = saveName;
-            else a.download = 'Samuel_Nwankwo_Resume.pdf';
+            a.href = url;
+            a.download = saveName || 'Samuel_Nwankwo_Resume.pdf';
             document.body.appendChild(a);
             a.click();
             a.remove();
-            ctx.banner(`$ curl ${target} ${saveName ? `--save=${saveName}` : ''}`);
-            ctx.out(`[✓] Download started — check your browser's downloads.`);
+            ctx.out('[✓] Download started — check your browser\'s downloads.');
           },
         };
       }
@@ -377,6 +411,32 @@ function browserOpen(ctx, url) {
       if (typeof window === 'undefined') return;
       window.open(url, '_blank', 'noopener,noreferrer');
       ctx.banner(`$ open ${url}`);
+      ctx.out('[↗] Opened in new tab.');
+    },
+  };
+}
+
+/** HEAD-check a local asset so we never open a 404 tab (missing resume PDF). */
+async function assetExists(url) {
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+function openAsset(ctx, url, target) {
+  return {
+    effects: async () => {
+      if (typeof window === 'undefined') return;
+      ctx.banner(`$ open ${target}`);
+      if (!(await assetExists(url))) {
+        ctx.error(`open: ${target}: 404 — file not installed yet.`);
+        ctx.out(`Email me for a copy → ${PROFILE.email}`);
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
       ctx.out('[↗] Opened in new tab.');
     },
   };

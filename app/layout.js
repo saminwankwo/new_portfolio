@@ -1,5 +1,6 @@
 import './globals.css';
 import Scanlines from './_components/Scanlines';
+import TerminalShell from './_components/TerminalShell';
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
@@ -73,6 +74,15 @@ export const viewport = {
   initialScale: 1,
 };
 
+/**
+ * The terminal shell lives in the ROOT LAYOUT (not template.js) on purpose:
+ * layouts persist across navigations, so scrollback history, cwd, theme and
+ * input history survive `router.push()` / browser back-forward (plan note 5).
+ *
+ * The shell is also the scroll container: `main.terminal-screen` is a fixed
+ * 100dvh flex column, the shell flexes to fill it, the scrollback scrolls
+ * internally, and the input row stays pinned at the bottom.
+ */
 export default function RootLayout({ children }) {
   return (
     <html
@@ -87,7 +97,7 @@ export default function RootLayout({ children }) {
         </a>
         <Scanlines />
         <main id="main-content" className="terminal-screen">
-          {children}
+          <TerminalShell>{children}</TerminalShell>
         </main>
       </body>
     </html>

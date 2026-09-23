@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter } from 'next/navigation';
 import { COMMANDS, COMMAND_NAMES } from '../_lib/commands.js';
 import {
-  homePath, resolvePath, routeToDir, dirToRoute,
-  normalizeSlashes, isDir, readFile, listDir as fsListDir,
+  homePath, resolvePath, routeToDir, prettyPath,
+  isDir, listDir as fsListDir,
 } from '../_lib/fileSystem.js';
 
 /* ============================== Context ================================ */
@@ -22,13 +22,16 @@ export function useTerminal() {
 
 /* ================================ Shell ================================= */
 
-const MOUNTED_HISTORY_BOOT = [
+/** Collision-proof entry id (works across reloads + restored sessions). */
+function uid() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const BOOT_HISTORY = [
   {
     id: 'boot-1',
     type: 'banner',
-    content:
-      "snsh 1.0 — Samuel Nwankwo's interactive portfolio shell.\n" +
-      'Type `help` and press Enter to get started. Try `neofetch` or `ls projects` for flavor.',
+    content: 'snsh 1.0 — connected to samuel@portfolio (NwankwoOS 1.0, Green Monochrome).',
   },
   {
     id: 'boot-2',
@@ -38,6 +41,17 @@ const MOUNTED_HISTORY_BOOT = [
   },
 ];
 
+/**
+ * The persistent terminal shell.
+ *
+ * Mounted ONCE in `app/layout.js` (layouts survive navigation, templates do
+ * not) so scrollback history, cwd, theme and input history all persist across
+ * `router.push()` and browser back/forward.
+ *
+ * Layout of the shell:
+ *   .terminal-scroll  → route content (server-rendered, SEO) + transcript
+ *   .terminal-input-row → pinned prompt + stdin, always visible
+ */
 export default function TerminalShell({ children, initialCwd, initialTheme = 'green' }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -45,7 +59,10 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const mountedRef = useRef(false);
-  const nextIdRef = useRef(1000);
+  /* Where the scrollback should sit after the next render:
+     true  → show the start of the screen (initial load / route change)
+     false → follow the newest output (command execution) */
+  const wantTopRef = useRef(true);
 
   /* ------------------------------- state ------------------------------- */
   const [mounted, setMounted] = useState(false);
@@ -59,22 +76,20 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
   const [shake, setShake] = useState(false);
 
   /* ----------------------------- helpers ------------------------------ */
-  const nextId = useCallback(() => ++nextIdRef.current, []);
+  // Unique per session AND per reload: avoids colliding with ids restored
+  // from localStorage.
+  const nextId = useCallback(() => uid(), []);
 
   const pushToHistory = useCallback((type, content, raw = null) => {
-    setHistory((prev) => [
-      ...prev,
-      {
-        id: nextId(),
-        type,
-        content,
-        raw,
-        ts: Date.now(),
-      },
-    ]);
+    setHistory((prev) => [...prev, { id: nextId(), type, content, raw, ts: Date.now() }]);
   }, [nextId]);
 
   const clearHistory = useCallback(() => setHistory([]), []);
+
+  const triggerShake = useCallback(() => {
+    setShake(true);
+    setTimeout(() => setShake(false), 220);
+  }, []);
 
   const setTheme = useCallback((name) => {
     setThemeState(name);
@@ -91,8 +106,8 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
   /* --------------------------- SSR → mount --------------------------- */
   useEffect(() => {
     mountedRef.current = true;
-    setMounted(true);
-    // Restore persisted theme + cwd + history + input history
+
+    // Restore persisted session (theme, cwd, input history, transcript).
     try {
       const t = localStorage.getItem(`${STORAGE_KEY}:theme`);
       if (t) { setThemeState(t); document.documentElement.setAttribute('data-theme', t); }
@@ -101,14 +116,18 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
       const ih = JSON.parse(localStorage.getItem(`${STORAGE_KEY}:inputs`) || '[]');
       if (Array.isArray(ih) && ih.length) setInputHistory(ih);
       const h = JSON.parse(localStorage.getItem(`${STORAGE_KEY}:history`) || 'null');
-      if (Array.isArray(h) && h.length) {
-        setHistory(h.slice(-150));
-      } else {
-        setHistory(MOUNTED_HISTORY_BOOT.map((b, i) => ({ ...b, id: nextIdRef.current + i, ts: Date.now() })));
-      }
-    } catch (_) {}
+      setHistory(
+        Array.isArray(h) && h.length
+          ? h.slice(-150)
+          : BOOT_HISTORY.map((b) => ({ ...b, ts: Date.now() }))
+      );
+    } catch (_) {
+      setHistory(BOOT_HISTORY.map((b) => ({ ...b, ts: Date.now() })));
+    }
 
-    // Focus input on mount (desktop only; mobile soft keyboard is annoying)
+    setMounted(true);
+
+    // Focus input on mount (desktop only; mobile soft keyboard is annoying).
     try {
       const isTouch = 'ontouchstart' in window;
       if (!isTouch) setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
@@ -117,7 +136,7 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
     return () => { mountedRef.current = false; };
   }, []);
 
-  // Persist when state changes (debounced by just writing on every change; small size)
+  // Persist session state.
   useEffect(() => {
     if (!mounted) return;
     try {
@@ -138,35 +157,38 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
   }, [history, mounted]);
 
   /* ---------------- Sync cwd ↔ pathname (URL ↔ FS dir) ---------------- */
+  // Declared BEFORE the scroll effect so that on a route change the scroll
+  // target is already "top of the new screen" when the effect runs.
   useEffect(() => {
     if (!mounted) return;
+    wantTopRef.current = true; // a new screen starts at its first line
     const targetDir = routeToDir(pathname);
-    if (targetDir !== cwd) {
-      // User navigated via browser back/forward or deep-link URL.
-      // Show a synthetic `cd /target` in scrollback so the state + URL agree.
-      setCwd(targetDir);
-      const rel = pathname === '/' ? '~' : pathname;
-      setHistory((prev) => {
-        // Avoid duplicate if we just appended
-        if (prev[prev.length - 1]?.raw === `cd ${rel}`) return prev;
-        const id1 = ++nextIdRef.current;
-        const id2 = ++nextIdRef.current;
-        return [
-          ...prev,
-          { id: id1, type: 'input', content: renderPrompt(targetDir) + ` cd ${rel}`, raw: `cd ${rel}`, ts: Date.now() },
-          { id: id2, type: 'output', content: `(navigated from URL: ${pathname})`, ts: Date.now() },
-        ];
-      });
-    }
+    if (targetDir === cwd) return;
+
+    // Navigated via deep link, browser back/forward, or a <Link> click.
+    // Mirror it into the transcript so the scrollback reflects how we got here.
+    setCwd(targetDir);
+    const rel = pathname === '/' ? '~' : pathname;
+    setHistory((prev) => {
+      if (prev[prev.length - 1]?.raw === `cd ${rel}`) return prev; // just appended by `cd`
+      return [
+        ...prev,
+        { id: uid(), type: 'input', content: renderPrompt(targetDir) + ` cd ${rel}`, raw: `cd ${rel}`, ts: Date.now() },
+        { id: uid(), type: 'output', content: `(navigated from URL: ${pathname})`, ts: Date.now() },
+      ];
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, mounted]);
 
   /* ------------------------- Autoscroll on append --------------------- */
   useEffect(() => {
     if (!mounted) return;
+    const el = scrollRef.current;
+    if (!el) return;
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
+      if (!el.isConnected) return;
+      el.scrollTo({
+        top: wantTopRef.current ? 0 : el.scrollHeight,
         behavior: 'instant',
       });
     });
@@ -174,17 +196,16 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
 
   /* ------------------------- command execution ------------------------ */
   const exec = useCallback(async (rawCommand) => {
+    // A command produces output below → follow it to the bottom.
+    wantTopRef.current = false;
+
     const trimmed = String(rawCommand || '').trim();
     if (!trimmed) {
       pushToHistory('input', renderPrompt(cwd), '');
       return;
     }
 
-    // Save into input history
-    setInputHistory((prev) => {
-      const arr = [...prev, trimmed];
-      return arr.slice(-200);
-    });
+    setInputHistory((prev) => [...prev, trimmed].slice(-200));
     setHistoryCursor(-1);
 
     // Tokenize (naive split on whitespace — good enough for our simple commands)
@@ -192,24 +213,21 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
     const cmdName = tokens[0];
     const argv = tokens.slice(1);
 
-    // Print input line first
     pushToHistory('input', renderPrompt(cwd) + ' ' + trimmed, trimmed);
 
     const cmd = COMMANDS[cmdName];
     if (!cmd) {
-      pushToHistory(
-        'error',
-        `snsh: command not found: ${cmdName}. Type 'help' to list commands.`
-      );
+      pushToHistory('error', `snsh: command not found: ${cmdName}. Type 'help' to list commands.`);
       triggerShake();
       return;
     }
 
     const shellCtx = {
       cwd,
+      pathname,
       history: [...history, { type: 'input', raw: trimmed, content: trimmed }],
       env: buildEnv(cwd),
-      setCwd(nextCwd) { setCwd(nextCwd); },
+      setCwd,
       pushToHistory,
       error: (s) => pushToHistory('error', s),
       out:   (s) => pushToHistory('output', s),
@@ -227,25 +245,17 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
 
     if (result && typeof result.effects === 'function') {
       try {
-        await result.effects({
-          router,
-          clearHistory,
-          setTheme,
-        });
+        await result.effects({ router, clearHistory, setTheme, pathname });
       } catch (e) {
         pushToHistory('error', `${cmdName}: effect failed: ${e?.message ?? String(e)}`);
       }
     }
-  }, [cwd, history, pushToHistory, clearHistory, setTheme, router]);
-
-  const triggerShake = () => {
-    setShake(true);
-    setTimeout(() => setShake(false), 200);
-  };
+  }, [cwd, pathname, history, pushToHistory, clearHistory, setTheme, router, triggerShake]);
 
   /* --------------------------- keyboard events ------------------------- */
   const onKeyDown = (e) => {
     const input = inputRef.current;
+    // Only capture keys while stdin has focus; otherwise let the browser be.
     if (!input || input !== document.activeElement) return;
 
     if (e.key === 'Enter') {
@@ -284,11 +294,12 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
 
     if (e.ctrlKey && (e.key === 'l' || e.key === 'L')) {
       e.preventDefault();
+      wantTopRef.current = true; // empty screen → nothing to follow
       clearHistory();
       return;
     }
     if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
-      // Cancel current input: echo `^C` then new prompt line, clear input
+      // Cancel current input: echo `^C` then a fresh prompt line.
       e.preventDefault();
       pushToHistory('input', renderPrompt(cwd) + ' ' + input.value + '^C', input.value);
       setRawInput('');
@@ -299,15 +310,14 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
     if (e.key === 'Tab') {
       e.preventDefault();
       handleTabAutocomplete(input);
-      return;
     }
   };
 
   const handleTabAutocomplete = (input) => {
     const val = input.value || '';
-    const beforeCursor = val;
-    const tokens = beforeCursor.split(/\s+/);
-    // If we're completing the first token → command name
+    const tokens = val.split(/\s+/);
+
+    // Completing the first token → command name.
     if (tokens.length === 1) {
       const prefix = tokens[0];
       if (!prefix) return;
@@ -320,71 +330,73 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
       }
       return;
     }
-    // Otherwise completing a path argument (last token)
+
+    // Otherwise complete the path in the last token.
     const lastTok = tokens[tokens.length - 1] ?? '';
-    const isPathArg = !/^-/.test(lastTok);
-    if (!isPathArg || !lastTok) return;
+    if (!lastTok || /^-/.test(lastTok)) return;
+
     const abs = resolvePath(cwd, lastTok);
-    const parentDir = lastTok.endsWith('/') || isDir(abs) ? abs : resolvePath(cwd, dirnameOf(lastTok));
+    const parentDir = lastTok.endsWith('/') || isDir(abs)
+      ? abs
+      : resolvePath(cwd, dirnameOf(lastTok));
     const prefix = lastTok.includes('/') ? lastTok.slice(0, lastTok.lastIndexOf('/') + 1) : '';
     const partialName = lastTok.includes('/') ? lastTok.slice(lastTok.lastIndexOf('/') + 1) : lastTok;
     const entries = readDirNames(parentDir);
     const matches = entries.filter((n) => n.startsWith(partialName));
+
     if (matches.length === 1) {
-      const newLast = prefix + matches[0] + (isDir(resolvePath(parentDir, matches[0])) ? '/' : '');
-      const newTokens = [...tokens.slice(0, -1), newLast];
-      setRawInput(newTokens.join(' '));
+      const done = prefix + matches[0] + (isDir(resolvePath(parentDir, matches[0])) ? '/' : '');
+      setRawInput([...tokens.slice(0, -1), done].join(' '));
     } else if (matches.length > 1) {
       pushToHistory('input', renderPrompt(cwd) + ' ' + val, val);
       pushToHistory('output', matches.join('   '));
     }
   };
 
+  /* Clicking the scrollback focuses stdin, but never steals a text selection
+     or a click that is landing on a link / form control. */
+  const onScrollClick = (e) => {
+    if (e.target.closest('a, button, input, textarea, select, label')) return;
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+    if (sel && String(sel).length > 0) return;
+    inputRef.current?.focus({ preventScroll: true });
+  };
+
   const contextValue = useMemo(() => ({
-    cwd, setCwd, theme, setTheme,
+    cwd, setCwd, theme, setTheme, pathname,
     history, pushToHistory, clearHistory, exec,
-    inputHistory, focus: () => inputRef.current?.focus({ preventScroll: true }),
-  }), [cwd, theme, history, pushToHistory, clearHistory, exec, inputHistory]);
+    inputHistory,
+    focus: () => inputRef.current?.focus({ preventScroll: true }),
+  }), [cwd, theme, pathname, history, pushToHistory, clearHistory, exec, inputHistory]);
 
   /* ------------------------------ render ------------------------------ */
-  const visibleHistory = mounted ? history : [];  // Avoid SSR/Client mismatch
-
   return (
     <TerminalContext.Provider value={contextValue}>
-      <div
-        ref={scrollRef}
-        className={
-          'w-full max-w-5xl mx-auto outline-none ' +
-          (shake ? 'animate-shake' : '')
-        }
-        style={{
-          flexGrow: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-        tabIndex={-1}
-        role="region"
-        aria-label="Interactive terminal"
-        onClick={() => inputRef.current?.focus({ preventScroll: true })}
-      >
-        {/* Route content (rendered server-side by individual pages) */}
-        <div className="mb-4 focus:outline-none">
-          {children}
+      <div className={'terminal-shell ' + (shake ? 'animate-shake' : '')}>
+        <div
+          ref={scrollRef}
+          className="terminal-scroll"
+          tabIndex={-1}
+          role="region"
+          aria-label="Terminal scrollback"
+          onClick={onScrollClick}
+        >
+          {/* Route content — server-rendered by each page (SEO-canonical). */}
+          <div className="route-content">{children}</div>
+
+          {/* Transcript — client-only after mount to avoid hydration mismatch. */}
+          {mounted && (
+            <div className="flex flex-col gap-1" aria-live="polite">
+              {history.map((h) => (
+                <HistoryLine key={h.id} entry={h} />
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Scrollback history (rendered client-only for hydration safety) */}
-        {mounted && (
-          <div className="flex flex-col gap-1" aria-live="polite">
-            {visibleHistory.map((h) => (
-              <HistoryLine key={h.id} entry={h} />
-            ))}
-          </div>
-        )}
-
-        {/* Current input row */}
-        <div className="mt-1 terminal-input-row" onKeyDown={onKeyDown}>
-          <PromptSpan cwd={mounted ? cwd : homePath()} />
+        {/* Pinned stdin row */}
+        <div className="terminal-input-row" onKeyDown={onKeyDown}>
+          <PromptSpan id="sn-term-prompt" cwd={mounted ? cwd : homePath()} />
           <label htmlFor="sn-term-input" className="sr-only">
             Terminal input. Type a command and press Enter to run it.
           </label>
@@ -397,18 +409,19 @@ export default function TerminalShell({ children, initialCwd, initialTheme = 'gr
             autoCorrect="off"
             autoCapitalize="off"
             autoComplete="off"
-            aria-label="Terminal command input"
-            aria-describedby="sn-term-help"
+            aria-describedby="sn-term-prompt sn-term-help"
             className="terminal-input flex-1"
             placeholder="type `help` and press Enter"
             disabled={!mounted}
           />
-          <span aria-hidden className="hidden sm:inline text-terminal-accent animate-blink select-none ml-0.5">▊</span>
+          <span aria-hidden className="hidden sm:inline text-terminal-accent animate-blink select-none ml-0.5">
+            ▊
+          </span>
+          <p id="sn-term-help" className="sr-only">
+            Use Tab to autocomplete commands and file paths. Use Arrow Up and Arrow Down to
+            navigate command history. Press Ctrl+L to clear the screen.
+          </p>
         </div>
-        <p id="sn-term-help" className="sr-only">
-          Use Tab to autocomplete commands and file paths. Use Arrow Up and Arrow Down to navigate
-          command history. Press Ctrl+L to clear the screen.
-        </p>
       </div>
     </TerminalContext.Provider>
   );
@@ -421,18 +434,18 @@ function HistoryLine({ entry }) {
   return (
     <div className={cls}>
       {typeof entry.content === 'string'
-        ? entry.content.split('\n').map((line, i) => <div key={i}>{line}</div>)
+        ? entry.content.split('\n').map((line, i) => <div key={i}>{line || '\u00A0'}</div>)
         : entry.content}
     </div>
   );
 }
 
-function PromptSpan({ cwd }) {
+function PromptSpan({ cwd, id }) {
   return (
-    <span className="terminal-prompt whitespace-nowrap">
+    <span id={id} className="terminal-prompt whitespace-nowrap">
       samuel@portfolio
       <span className="text-terminal-fg-dim">:</span>
-      <span className="terminal-path">{cwd === homePath() ? '~' : cwd}</span>
+      <span className="terminal-path">{prettyPath(cwd)}</span>
       <span className="text-terminal-fg-dim">$</span>
       <span className="inline-block w-2" />
     </span>
@@ -442,7 +455,7 @@ function PromptSpan({ cwd }) {
 /* ================================= Helpers ============================= */
 
 function renderPrompt(cwd) {
-  return `samuel@portfolio:${cwd === homePath() ? '~' : cwd}$ `;
+  return `samuel@portfolio:${prettyPath(cwd)}$ `;
 }
 
 function buildEnv(cwd) {

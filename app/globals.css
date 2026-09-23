@@ -72,8 +72,11 @@
   body {
     padding: 0;
     margin: 0;
-    min-height: 100vh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100dvh;
+    /* The shell owns its own scrollback; the document itself never scrolls.
+       Keeps the prompt pinned and prevents double scrollbars on iOS. */
+    overflow: hidden;
     background-color: var(--terminal-bg);
     color: var(--terminal-fg);
     font-family: theme('fontFamily.terminal');
@@ -92,15 +95,21 @@
     color: var(--terminal-fg);
   }
 
-  /* Always show focus ring on keyboard focus */
+  /* Focus rings: `:focus { outline: none }` MUST come before / be narrower
+     than `:focus-visible`, otherwise equal specificity + source order kills
+     the keyboard focus ring (a11y). */
+  :focus {
+    outline: none;
+  }
+
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
   :focus-visible {
     outline: 2px solid var(--terminal-accent);
     outline-offset: 2px;
     border-radius: 2px;
-  }
-
-  :focus {
-    outline: none;
   }
 
   a {
@@ -133,9 +142,54 @@
 }
 
 @layer components {
+  /* Fixed-height flex column: `main` fills the viewport, the shell flexes to
+     fill the remaining space, the scrollback scrolls inside it. */
   .terminal-screen {
-    @apply min-h-[100dvh] w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10;
+    @apply w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background-color: var(--terminal-bg);
+  }
+
+  /* Root of the interactive shell (mounted once in layout.js). */
+  .terminal-shell {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0; /* required so the child can scroll */
+  }
+
+  /* Scrollback: route content + command transcript. */
+  .terminal-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    outline: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--terminal-border) transparent;
+  }
+  .terminal-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .terminal-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--terminal-border);
+    border-radius: 8px;
+  }
+
+  /* Server-rendered route body (SEO-canonical content) inside the scrollback. */
+  .route-content {
+    width: 100%;
+    margin-bottom: 1rem;
   }
 
   .terminal-prompt {
@@ -182,6 +236,16 @@
     font-weight: 700;
     line-height: 1.1;
     letter-spacing: 0.01em;
+    /* Banner art must never wrap mid-glyph: scale down instead (plan step 23). */
+    font-size: clamp(0.45rem, 2.2vw, 1.4rem);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .terminal-ascii::-webkit-scrollbar {
+    display: none;
+  }
+  .terminal-ascii .terminal-line {
+    white-space: pre;
   }
 
   .terminal-ascii small {
@@ -224,12 +288,16 @@
     padding: 1rem;
   }
 
-  /* Input row styling */
+  /* Input row styling — pinned below the scrollback, never scrolls away. */
   .terminal-input-row {
     display: flex;
+    flex: 0 0 auto;
     flex-wrap: wrap;
     align-items: flex-start;
     gap: 0.25rem 0.5rem;
+    width: 100%;
+    padding-top: 0.25rem;
+    border-top: 1px solid var(--terminal-border);
   }
   .terminal-input-row:focus-within {
     background: linear-gradient(
@@ -246,7 +314,9 @@
     flex: 1 1 12rem;
     background: transparent;
     border: none;
-    outline: none;
+    /* NOTE: no `outline: none` here — the components layer would beat the
+       base-layer `:focus-visible` rule and hide the focus ring. Mouse-focus
+       outlines are suppressed by base `:focus:not(:focus-visible)` instead. */
     color: var(--terminal-fg);
     caret-color: var(--terminal-accent);
     font-family: inherit;
@@ -258,6 +328,20 @@
   .terminal-input::placeholder {
     color: var(--terminal-fg-dim);
     opacity: 0.5;
+  }
+
+  /* Narrow screens: prompt drops to its own line, input goes full width. */
+  @media (max-width: 420px) {
+    .terminal-input-row {
+      gap: 0;
+    }
+    .terminal-prompt {
+      display: block;
+      width: 100%;
+    }
+    .terminal-input {
+      flex: 1 1 100%;
+    }
   }
 
   /* Skip link */

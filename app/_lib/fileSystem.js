@@ -148,23 +148,26 @@ export const FS = {
             },
             projects: {
               type: 'dir',
-              children: Object.fromEntries(
-                PROJECTS.map((p, i) => [
-                  p.slug,
-                  { type: 'link', target: `/home/samuel/projects/${p.slug}.md`, project: p, order: i },
-                ])
-              ),
-              // Also expose the .md files directly:
-              ...Object.fromEntries(
-                Object.entries(PROJECT_FILES).map(([name, content]) => [
-                  name,
-                  { type: 'file', content, meta: { size: content.length } },
-                ])
-              ),
-              index: {
-                type: 'file',
-                content: joinLines(PROJECT_INDEX_LINES),
-                meta: { size: PROJECT_INDEX_LINES.join('\n').length },
+              children: {
+                // One real file per project. `cat projects/<slug>` and
+                // `cat projects/<slug>.md` both resolve (see readFile's
+                // `.md` fallback) — no duplicate symlink rows in `ls`.
+                ...Object.fromEntries(
+                  PROJECTS.map((p, i) => [
+                    `${p.slug}.md`,
+                    {
+                      type: 'file',
+                      content: PROJECT_FILES[`${p.slug}.md`],
+                      meta: { size: PROJECT_FILES[`${p.slug}.md`].length, modified: 'Sep 22 10:00', order: i },
+                      project: p,
+                    },
+                  ])
+                ),
+                index: {
+                  type: 'file',
+                  content: joinLines(PROJECT_INDEX_LINES),
+                  meta: { size: PROJECT_INDEX_LINES.join('\n').length, modified: 'Sep 22 10:00' },
+                },
               },
             },
             experience: {
@@ -278,7 +281,7 @@ export function listDir(absPath, { all = false, long = false } = {}) {
       }
       const size =
         child.meta?.size ?? (entryType === 'dir' ? 4096 : 0);
-      const modified = child.meta?.modified ?? child.project ? '—' : '—';
+      const modified = child.meta?.modified ?? '—';
       return {
         name,
         type: entryType,
@@ -298,7 +301,11 @@ export function listDir(absPath, { all = false, long = false } = {}) {
  *   { ok: false, reason: 'no such file|is a directory|path not found' } otherwise
  */
 export function readFile(absPath) {
-  const resolved = getLeafAt(absPath);
+  let resolved = getLeafAt(absPath);
+  // Convenience fallback: `cat about` works like `cat about.md`.
+  if (!resolved && !absPath.endsWith('.md')) {
+    resolved = getLeafAt(`${absPath}.md`);
+  }
   if (!resolved) return { ok: false, reason: 'path not found' };
   const { node } = resolved;
   if (node.type === 'dir') return { ok: false, reason: 'is a directory' };
@@ -318,11 +325,25 @@ export function basename(path) {
   return parts[parts.length - 1] || '';
 }
 
+/**
+ * Home-relative display path for prompts and `pwd`:
+ *   /home/samuel          → ~
+ *   /home/samuel/projects → ~/projects
+ *   /                     → /
+ */
+export function prettyPath(absPath) {
+  const p = normalizeSlashes(absPath);
+  if (p === HOME) return '~';
+  if (p.startsWith(`${HOME}/`)) return `~${p.slice(HOME.length)}`;
+  return p;
+}
+
 /** Map known routes to FS dirs and vice-versa */
 export const ROUTE_TO_DIR = {
   '/':          '/home/samuel',
   '/projects':  '/home/samuel/projects',
   '/experience':'/home/samuel/experience',
+  // contact + resume are *files* inside ~, but their URLs are routes:
   '/contact':   '/home/samuel',
   '/resume':    '/home/samuel',
 };

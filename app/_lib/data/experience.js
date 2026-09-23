@@ -79,4 +79,6 @@ export const EDUCATION = [
   },
 ];
 
-export default { ROLES, EDUCATION };
+const EXPERIENCE = { ROLES, EDUCATION };
+
+export default EXPERIENCE;
